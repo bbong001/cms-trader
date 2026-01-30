@@ -1,0 +1,9 @@
+---
+import CMSLayout from '../../layouts/CMSLayout.astro';
+import WalletDetail from '../../components/WalletDetail';
+---
+
+<CMSLayout>
+  <WalletDetail client:load walletId={Astro.params.id as string} />
+</CMSLayout>
+

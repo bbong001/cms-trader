@@ -1,0 +1,9 @@
+---
+import CMSLayout from '../../layouts/CMSLayout.astro';
+import SpotOrderDetail from '../../components/SpotOrderDetail';
+---
+
+<CMSLayout>
+  <SpotOrderDetail client:load orderId={Astro.params.id as string} />
+</CMSLayout>
+

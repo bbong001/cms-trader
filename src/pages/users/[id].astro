@@ -1,0 +1,9 @@
+---
+import CMSLayout from '../../layouts/CMSLayout.astro';
+import UserDetail from '../../components/UserDetail';
+---
+
+<CMSLayout>
+  <UserDetail client:load userId={Astro.params.id as string} />
+</CMSLayout>
+

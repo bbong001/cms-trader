@@ -1,0 +1,9 @@
+---
+import CMSLayout from '../../layouts/CMSLayout.astro';
+import IEOInvestmentDetail from '../../components/IEOInvestmentDetail';
+---
+
+<CMSLayout>
+  <IEOInvestmentDetail client:load investmentId={Astro.params.id as string} />
+</CMSLayout>
+

@@ -1,0 +1,9 @@
+---
+import CMSLayout from '../../layouts/CMSLayout.astro';
+import ContractPositionDetail from '../../components/ContractPositionDetail';
+---
+
+<CMSLayout>
+  <ContractPositionDetail client:load positionId={Astro.params.id as string} />
+</CMSLayout>
+

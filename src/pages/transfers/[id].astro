@@ -1,0 +1,9 @@
+---
+import CMSLayout from '../../layouts/CMSLayout.astro';
+import TransferDetail from '../../components/TransferDetail';
+---
+
+<CMSLayout>
+  <TransferDetail client:load transferId={Astro.params.id as string} />
+</CMSLayout>
+

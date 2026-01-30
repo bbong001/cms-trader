@@ -1,0 +1,11 @@
+---
+import CMSLayout from '../../layouts/CMSLayout.astro';
+import DepositRequestDetail from '../../components/DepositRequestDetail';
+
+const { id } = Astro.params;
+---
+
+<CMSLayout title={`Deposit Request #${id}`}>
+  <DepositRequestDetail id={id} client:load />
+</CMSLayout>
+

@@ -1,0 +1,27 @@
+---
+import LoginForm from '../components/LoginForm';
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CMS Login - Trader</title>
+    <script>
+      // Redirect if already logged in
+      if (document.cookie.includes('cms-session=')) {
+        window.location.href = '/';
+      }
+    </script>
+  </head>
+  <body class="bg-gray-100">
+    <div class="min-h-screen flex items-center justify-center">
+      <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+        <h1 class="text-2xl font-bold text-center mb-6">Trader CMS</h1>
+        <LoginForm client:load />
+      </div>
+    </div>
+  </body>
+</html>
+

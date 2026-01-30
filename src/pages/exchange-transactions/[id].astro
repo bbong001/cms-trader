@@ -1,0 +1,9 @@
+---
+import CMSLayout from '../../layouts/CMSLayout.astro';
+import ExchangeTransactionDetail from '../../components/ExchangeTransactionDetail';
+---
+
+<CMSLayout>
+  <ExchangeTransactionDetail client:load transactionId={Astro.params.id as string} />
+</CMSLayout>
+

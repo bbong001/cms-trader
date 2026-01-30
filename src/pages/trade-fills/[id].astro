@@ -1,0 +1,9 @@
+---
+import CMSLayout from '../../layouts/CMSLayout.astro';
+import TradeFillDetail from '../../components/TradeFillDetail';
+---
+
+<CMSLayout>
+  <TradeFillDetail client:load fillId={Astro.params.id as string} />
+</CMSLayout>
+

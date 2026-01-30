@@ -1,0 +1,9 @@
+---
+import CMSLayout from '../../layouts/CMSLayout.astro';
+import WithdrawalRequestDetail from '../../components/WithdrawalRequestDetail';
+---
+
+<CMSLayout>
+  <WithdrawalRequestDetail client:load requestId={Astro.params.id as string} />
+</CMSLayout>
+
