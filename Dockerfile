@@ -41,10 +41,6 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma/
 # Copy built application
 COPY --from=builder /app/dist ./dist/
 
-# Copy public assets (will fail silently if doesn't exist)
-RUN mkdir -p ./public
-COPY --from=builder /app/public ./public/
-
 # Expose port
 EXPOSE 4322
 
