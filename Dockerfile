@@ -46,6 +46,8 @@ EXPOSE 4322
 
 # Set environment to production
 ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=4322
 
 # Start the server
 CMD ["node", "dist/server/entry.mjs"]

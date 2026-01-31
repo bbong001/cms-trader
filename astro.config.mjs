@@ -9,6 +9,10 @@ export default defineConfig({
   adapter: node({
     mode: 'standalone',
   }),
+  server: {
+    host: true, // Listen on 0.0.0.0
+    port: 4322,
+  },
   integrations: [react(), tailwind()],
   vite: {
     ssr: {
