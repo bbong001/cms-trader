@@ -25,7 +25,7 @@ export const GET: APIRoute = async ({ url }) => {
     }
 
     const orderBy: any = {};
-    const validSortFields = ['id', 'symbol', 'status', 'side', 'entryPrice', 'exitPrice', 'quantity', 'createdAt'];
+    const validSortFields = ['id', 'symbol', 'status', 'side', 'entryPrice', 'exitPrice', 'amount', 'createdAt', 'expiresAt'];
     const field = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
     orderBy[field] = sortOrder === 'asc' ? 'asc' : 'desc';
 

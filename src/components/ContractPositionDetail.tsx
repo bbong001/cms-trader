@@ -4,15 +4,23 @@ interface ContractPositionDetailProps {
   positionId: string;
 }
 
+function fetchPosition(positionId: string) {
+  return fetch(`/api/contract-positions/${positionId}`)
+    .then((res) => res.json())
+    .then((data) => data.data);
+}
+
 export default function ContractPositionDetail({ positionId }: ContractPositionDetailProps) {
   const [position, setPosition] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [editResult, setEditResult] = useState<'WIN' | 'LOSS'>('WIN');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/contract-positions/${positionId}`)
-      .then((res) => res.json())
+    fetchPosition(positionId)
       .then((data) => {
-        setPosition(data.data);
+        setPosition(data);
         setLoading(false);
       })
       .catch((err) => {
@@ -24,13 +32,41 @@ export default function ContractPositionDetail({ positionId }: ContractPositionD
   if (loading) return <div className="p-8 text-center">Loading...</div>;
   if (!position) return <div className="p-8 text-center text-red-600">Contract position not found</div>;
 
-  const profitLoss = position.actualProfit != null 
-    ? Number(position.actualProfit) 
+  const profitLoss = position.actualProfit != null
+    ? Number(position.actualProfit)
     : position.exitPrice != null && position.entryPrice != null
-    ? (position.direction === 'UP' 
-        ? (Number(position.exitPrice) - Number(position.entryPrice)) * Number(position.amount)
-        : (Number(position.entryPrice) - Number(position.exitPrice)) * Number(position.amount))
-    : null;
+      ? (position.side === 'BUY_UP'
+          ? (Number(position.exitPrice) - Number(position.entryPrice)) * Number(position.amount)
+          : (Number(position.entryPrice) - Number(position.exitPrice)) * Number(position.amount))
+      : null;
+
+  const expiresAt = position.expiresAt ? new Date(position.expiresAt) : null;
+  const isExpired = expiresAt != null && expiresAt <= new Date();
+  const canEditWinLoss = position.status === 'OPEN' && !isExpired;
+
+  const handleSaveWinLoss = async () => {
+    if (!position || !canEditWinLoss) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/contract-positions/${positionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ result: editResult }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSaveError(data.error || 'Có lỗi');
+        return;
+      }
+      const updated = await fetchPosition(positionId);
+      setPosition(updated);
+    } catch (err: any) {
+      setSaveError(err.message || 'Có lỗi');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div>
@@ -67,9 +103,9 @@ export default function ContractPositionDetail({ positionId }: ContractPositionD
             <label className="text-sm font-medium text-gray-500">Direction</label>
             <p className="text-lg">
               <span className={`px-2 py-1 rounded text-sm font-medium ${
-                position.direction === 'UP' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                position.side === 'BUY_UP' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
               }`}>
-                {position.direction}
+                {position.side === 'BUY_UP' ? 'UP' : 'DOWN'}
               </span>
             </p>
           </div>
@@ -127,8 +163,13 @@ export default function ContractPositionDetail({ positionId }: ContractPositionD
           </div>
           <div>
             <label className="text-sm font-medium text-gray-500">Expires At</label>
-            <p className="text-lg">
+            <p className="text-lg flex items-center gap-2">
               {position.expiresAt ? new Date(position.expiresAt).toLocaleString() : '-'}
+              {isExpired ? (
+                <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700">Đã hết hạn</span>
+              ) : (
+                <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Chưa hết hạn</span>
+              )}
             </p>
           </div>
           <div>
@@ -143,6 +184,53 @@ export default function ContractPositionDetail({ positionId }: ContractPositionD
           </div>
         </div>
       </div>
+
+      {/* Chỉnh Win/Loss - chỉ khi chưa hết hạn */}
+      {position.status === 'OPEN' && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-xl font-bold mb-4">Chỉnh Win / Loss</h2>
+          {isExpired ? (
+            <p className="text-gray-500">Đã hết hạn, không thể chỉnh kết quả.</p>
+          ) : (
+            <>
+              <p className="text-sm text-gray-600 mb-4">
+                Win = ăn đúng số tiền đặt (profit = amount). Loss = thua hết số tiền đặt.
+              </p>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="result"
+                    checked={editResult === 'WIN'}
+                    onChange={() => setEditResult('WIN')}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-green-700 font-medium">WIN</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="result"
+                    checked={editResult === 'LOSS'}
+                    onChange={() => setEditResult('LOSS')}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-red-700 font-medium">LOSS</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleSaveWinLoss}
+                  disabled={saving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {saving ? 'Đang lưu...' : 'Lưu'}
+                </button>
+              </div>
+              {saveError && <p className="mt-2 text-sm text-red-600">{saveError}</p>}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Position Summary */}
       {position.status === 'CLOSED' && (
