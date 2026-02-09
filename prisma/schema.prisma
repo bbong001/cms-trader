@@ -186,6 +186,18 @@ model IEOInvestment {
   @@map("ieo_investments")
 }
 
+// ContractSessionControl: Control next session result (100% WIN/LOSS)
+model ContractSessionControl {
+  id        Int      @id @default(autoincrement())
+  /// Final result for the controlled session: WIN or LOSS
+  final     String
+  /// Whether this control is active for the next session
+  required  Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("contract_session_controls")
+}
+
 // MiningProduct: AI Mining products
 model MiningProduct {
   id                Int       @id @default(autoincrement())
