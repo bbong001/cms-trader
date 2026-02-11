@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { prisma } from '../../../server/prisma';
+import { Prisma } from '@prisma/client';
 
 export const GET: APIRoute = async ({ params }) => {
   try {
@@ -31,7 +32,7 @@ export const GET: APIRoute = async ({ params }) => {
 /**
  * PUT: Chỉnh Win/Loss cho position. Chỉ cho phép khi chưa hết hạn (expiresAt > now).
  * Body: { result: 'WIN' | 'LOSS' }
- * Win = profit = amount (tổng nhận 2*amount). Loss = thua hết amount.
+ * Win = profit tính theo profitability từ duration option, trừ 1% fee. Loss = thua hết amount.
  */
 export const PUT: APIRoute = async ({ params, request }) => {
   try {
@@ -74,7 +75,18 @@ export const PUT: APIRoute = async ({ params, request }) => {
     }
 
     const amount = position.amount;
-    const actualProfit = result === 'WIN' ? amount : amount.negated();
+    const profitability = position.profitability || new Prisma.Decimal(0);
+    
+    // Tính profit theo profitability và trừ 1% fee
+    const profitPercentage = profitability.div(100);
+    const profitBeforeFee = amount.mul(profitPercentage);
+    const fee = profitBeforeFee.mul(0.01); // 1% fee từ profit
+    const netProfit = profitBeforeFee.sub(fee);
+    
+    // actualProfit: WIN = netProfit (profit sau fee), LOSS = -profitBeforeFee - fee (thua đi profit và fee)
+    const actualProfit = result === 'WIN' 
+      ? netProfit // Win: chỉ profit sau fee
+      : profitBeforeFee.add(fee).negated(); // Loss: thua đi profitBeforeFee + fee
 
     const updated = await prisma.$transaction(async (tx: any) => {
       let wallet = await tx.wallet.findUnique({
@@ -91,15 +103,19 @@ export const PUT: APIRoute = async ({ params, request }) => {
         });
       }
 
-      const newLocked = wallet.locked.sub(amount);
+      // WIN: cộng lại amount + netProfit vào available (vì đã trừ amount khi đặt lệnh)
+      // LOSS: cộng lại (amount - profitBeforeFee - fee) vào available (vì đã trừ amount khi đặt lệnh)
+      const profitPercentage = profitability.div(100);
+      const profitBeforeFee = amount.mul(profitPercentage);
+      
       const newAvailable =
         result === 'WIN'
-          ? wallet.available.add(amount).add(amount)
-          : wallet.available;
+          ? wallet.available.add(netProfit) // WIN: cộng lại amount + netProfit
+          : wallet.available.add(amount.sub(profitBeforeFee).sub(fee)); // LOSS: cộng lại (amount - profitBeforeFee - fee)
 
       await tx.wallet.update({
         where: { id: wallet.id },
-        data: { available: newAvailable, locked: newLocked },
+        data: { available: newAvailable },
       });
 
       return tx.contractPosition.update({
