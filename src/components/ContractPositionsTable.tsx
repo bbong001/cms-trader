@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { io, Socket } from 'socket.io-client';
 import DataTable from './DataTable';
 
 interface SessionControlConfig {
@@ -15,6 +16,43 @@ export default function ContractPositionsTable() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0); // Dùng để trigger reload DataTable
+  const socketRef = useRef<Socket | null>(null);
+
+  // Initialize socket connection
+  useEffect(() => {
+    const socketUrl = 'http://localhost:3000';
+    const socket = io(socketUrl, {
+      transports: ['websocket'],
+      reconnection: true,
+    });
+    socket.on('connect', () => {
+      console.log('CMS connected to socket for contract positions');
+      socket.emit('join-admin');
+    });
+
+    socket.on('contract:new-position', (data) => {
+      console.log('New contract position received:', data);
+      
+      // 1. Phát âm thanh thông báo
+      try {
+        const audio = new Audio('/sounds/notification.mp3');
+        audio.volume = 0.6;
+        audio.play().catch(err => console.warn('Autoplay prevented:', err));
+      } catch (err) {
+        console.error('Error playing sound:', err);
+      }
+
+      // 2. Trigger reload bảng
+      setRefreshKey(prev => prev + 1);
+    });
+
+    socketRef.current = socket;
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   const fetchSessionConfigs = async () => {
     try {
@@ -106,6 +144,7 @@ export default function ContractPositionsTable() {
       </div>
 
       <DataTable
+        key={refreshKey} // Dùng key để force remount/reload khi có lệnh mới
         title="Contract Positions"
         apiUrl="/api/contract-positions/list"
         columns={[
@@ -142,7 +181,7 @@ export default function ContractPositionsTable() {
               if (!row.expiresAt) return '-';
               return new Date(row.expiresAt) <= new Date() ? 'Có' : 'Chưa';
             },
-            render: (value, row) => {
+            render: (_value, row) => {
               if (!row.expiresAt) return '-';
               const expired = new Date(row.expiresAt) <= new Date();
               return (
@@ -302,4 +341,3 @@ export default function ContractPositionsTable() {
     </div>
   );
 }
-
