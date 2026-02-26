@@ -2,13 +2,19 @@
 import { PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
+import dotenv from 'dotenv';
+import path from 'node:path';
 
 declare global {
   // eslint-disable-next-line no-var
+  // eslint-disable-next-line no-var, vars-on-top
   var prisma: PrismaClient | undefined;
 }
 
-// Use DATABASE_URL from environment; Astro loads .env on the server
+// Ưu tiên load DATABASE_URL từ file config.env ở root (thay cho .env)
+dotenv.config({ path: path.resolve(process.cwd(), 'config.env') });
+
+// Use DATABASE_URL from environment
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {

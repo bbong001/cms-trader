@@ -276,19 +276,13 @@ export default function ChatPage() {
   }, [unreadTotal]);
 
   const playNotificationSound = () => {
-    try {
-      const audio = new Audio('/sounds/notification.mp3');
-      audio.volume = 0.5;
-      audio.play().catch(() => {
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('New message', {
-            body: 'You have a new message from a user',
-            icon: '/favicon.ico',
-          });
-        }
+    // Âm thanh thông báo đã được xử lý global trong CMSLayout (header),
+    // ở đây chỉ fallback Notification nếu cần trong tương lai.
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('New message', {
+        body: 'You have a new message from a user',
+        icon: '/favicon.ico',
       });
-    } catch (error) {
-      console.error('Error playing notification:', error);
     }
   };
 
@@ -296,21 +290,22 @@ export default function ChatPage() {
     const trimmed = input.trim();
     if (!trimmed || !selectedConversation || !socket) return;
 
-    // Optimistic update: Add message to UI immediately
-    const tempMessage: Message = {
-      id: Date.now(), // Temporary ID
-      senderId: 0,
-      senderType: 'admin',
-      content: trimmed,
-      imageUrl: null,
-      createdAt: new Date().toISOString(),
-      isRead: false,
-    };
-    setMessages((prev) => [...prev, tempMessage]);
-    setInput('');
-    scrollToBottom();
-
     try {
+      // Optimistic update: Add message to UI immediately
+      const tempMessage: Message = {
+        id: Date.now(), // Temporary ID
+        senderId: 0,
+        senderType: 'admin',
+        content: trimmed,
+        imageUrl: null,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+      };
+      setMessages((prev) => [...prev, tempMessage]);
+      setInput('');
+      scrollToBottom();
+
+      // Gửi qua socket để realtime cho phía user (giữ nguyên hành vi cũ)
       socket.emit('send-message', {
         conversationId: selectedConversation,
         senderId: 0, // Admin ID
@@ -318,10 +313,25 @@ export default function ChatPage() {
         content: trimmed,
         imageUrl: null,
       });
+
+      // Gọi API nội bộ để lưu message vào database (fallback nếu socket/back-end ngoài không lưu)
+      await fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          conversationId: selectedConversation,
+          content: trimmed,
+          imageUrl: null,
+        }),
+      });
     } catch (error) {
       console.error('Error sending message:', error);
-      // Remove optimistic message on error
-      setMessages((prev) => prev.filter((m) => m.id !== tempMessage.id));
+      // Nếu lỗi, reload lại messages từ server để tránh state bị lệch
+      if (selectedConversation) {
+        await loadMessages(selectedConversation);
+      }
     }
   };
 
@@ -329,51 +339,72 @@ export default function ChatPage() {
     const file = e.target.files?.[0];
     if (!file || !selectedConversation || !socket) return;
 
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Image size must be less than 5MB');
-      return;
-    }
-
-    setUploading(true);
-
     try {
-      const formData = new FormData();
-      formData.append('image', file);
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
 
-      const response = await fetch('/api/chat/upload-image', {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image size must be less than 5MB');
+        return;
+      }
+
+      setUploading(true);
+
+      // Upload trực tiếp lên Cloudinary, chỉ lưu URL
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'glory365');
+      formData.append('folder', 'api-glory365');
+
+      const response = await fetch('https://api.cloudinary.com/v1_1/dbsy0kyh5/image/upload', {
         method: 'POST',
         body: formData,
       });
 
       const data = await response.json();
 
-      if (data.data?.imageUrl) {
-        // Optimistic update for image
-        const tempMessage: Message = {
-          id: Date.now(),
-          senderId: 0,
-          senderType: 'admin',
-          content: null,
-          imageUrl: data.data.imageUrl,
-          createdAt: new Date().toISOString(),
-          isRead: false,
-        };
-        setMessages((prev) => [...prev, tempMessage]);
-        scrollToBottom();
-
-        socket.emit('send-message', {
-          conversationId: selectedConversation,
-          senderId: 0,
-          senderType: 'admin',
-          content: null,
-          imageUrl: data.data.imageUrl,
-        });
+      if (!response.ok || !data.secure_url) {
+        throw new Error(data.message || 'Failed to upload image to Cloudinary');
       }
+
+      const imageUrl = data.secure_url as string;
+
+      // Optimistic update cho message ảnh
+      const tempMessage: Message = {
+        id: Date.now(),
+        senderId: 0,
+        senderType: 'admin',
+        content: null,
+        imageUrl,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+      };
+      setMessages((prev) => [...prev, tempMessage]);
+      scrollToBottom();
+
+      // Gửi qua socket để realtime
+      socket.emit('send-message', {
+        conversationId: selectedConversation,
+        senderId: 0,
+        senderType: 'admin',
+        content: null,
+        imageUrl,
+      });
+
+      // Lưu URL ảnh Cloudinary vào database qua API nội bộ
+      await fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          conversationId: selectedConversation,
+          content: null,
+          imageUrl,
+        }),
+      });
     } catch (error) {
       console.error('Error uploading image:', error);
       alert('Failed to upload image');

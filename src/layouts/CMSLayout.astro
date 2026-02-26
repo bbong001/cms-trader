@@ -154,6 +154,8 @@ if (!adminId) {
     </div>
 
     <script>
+      import { io } from 'socket.io-client';
+
       // Mobile menu toggle
       const menuToggle = document.getElementById('mobile-menu-toggle');
       const sidebar = document.getElementById('sidebar');
@@ -176,6 +178,46 @@ if (!adminId) {
           }
         });
       });
+
+      // Global chat notification socket: phát âm thanh trên mọi page khi có tin nhắn mới
+      try {
+        const socketUrl =
+          import.meta.env.PUBLIC_SOCKET_URL ||
+          (import.meta.env.MODE === 'production'
+            ? 'https://app-trader.railway.internal'
+            : 'http://localhost:3000');
+
+      const notificationAudio = new Audio('/sounds/notifications.wav');
+      // Tăng âm lượng thông báo (0.0 - 1.0)
+      notificationAudio.volume = 1;
+
+        const socket = io(socketUrl, {
+          transports: ['websocket'],
+          reconnection: true,
+        });
+
+        socket.on('connect', () => {
+          console.log('CMS header connected to chat socket');
+        });
+
+        // Khi server bắn sự kiện tin nhắn mới cho admin, phát âm thanh
+        socket.on('admin-notification', () => {
+          try {
+            notificationAudio.currentTime = 0;
+            notificationAudio.play().catch(() => {
+              // Trường hợp trình duyệt chặn autoplay, bỏ qua
+            });
+          } catch (err) {
+            console.error('Failed to play notification sound', err);
+          }
+        });
+
+        socket.on('error', (err) => {
+          console.error('Chat socket error in header:', err);
+        });
+      } catch (err) {
+        console.error('Failed to init chat socket in header:', err);
+      }
     </script>
   </body>
 </html>
